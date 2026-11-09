@@ -302,6 +302,15 @@ td.num,th.num{text-align:right;font-family:var(--f-mono)}
 <script>
 "use strict";
 const PREFIX = "logos-hrr-";
+// Bridge (TURN) servers: used only when a direct connection is blocked, e.g. by the school network.
+const ICE = {config:{iceServers:[
+  {urls:"stun:stun.l.google.com:19302"},
+  {urls:"stun:stun.relay.metered.ca:80"},
+  {urls:"turn:global.relay.metered.ca:80", username:"cad9c55374476f60b0431135", credential:"k0jrUMRyXpQNAfYH"},
+  {urls:"turn:global.relay.metered.ca:80?transport=tcp", username:"cad9c55374476f60b0431135", credential:"k0jrUMRyXpQNAfYH"},
+  {urls:"turn:global.relay.metered.ca:443", username:"cad9c55374476f60b0431135", credential:"k0jrUMRyXpQNAfYH"},
+  {urls:"turns:global.relay.metered.ca:443?transport=tcp", username:"cad9c55374476f60b0431135", credential:"k0jrUMRyXpQNAfYH"}
+]}};
 // taps = how hard it is to pass heat to the next particle; gap = how far apart the particles sit on screen.
 // Order matches real thermal conductivity: copper > steel > plastic > wood > wool > air.
 const MATS = {
@@ -350,7 +359,7 @@ function startHost(){
   function openPeer(){
     const L = "ABCDEFGHJKMNPQRSTUVWXYZ";
     code = Array.from({length:4},()=>L[Math.floor(Math.random()*L.length)]).join("");
-    peer = new Peer(PREFIX + code);
+    peer = new Peer(PREFIX + code, ICE);
     peer.on("open", () => {
       $("hCode").textContent = code;
       const url = `${location.origin}${location.pathname}?join=${code}`;
@@ -666,6 +675,16 @@ function startPlayer(code){
   async function keepAwake(){ try{ await navigator.wakeLock?.request("screen"); }catch(e){} }
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && joined) keepAwake(); });
 
+  // Connection diagnostics: each failure names the step that broke, plus where the page is running.
+  let dT = null;
+  const where = () => ` [${location.host || "sin dominio"}${window.self !== window.top ? " · dentro de un marco" : ""}]`;
+  function diag(msg){
+    clearTimeout(dT);
+    if (joined){ setTimeout(connect, 2500); return; }
+    $("pGo").disabled = false;
+    $("pJoinMsg").textContent = msg + where();
+  }
+
   function connect(){
     const c = $("pCode").value.trim().toUpperCase(), name = $("pName").value.trim();
     if (c.length !== 4){ $("pJoinMsg").textContent = "The game code has 4 letters. It's on the big screen."; return; }
@@ -673,14 +692,22 @@ function startPlayer(code){
     store.set("hrr-name", name);
     $("pGo").disabled = true; $("pJoinMsg").textContent = "Connecting…";
     if (peer) try{ peer.destroy(); }catch(e){}
-    peer = new Peer();
+    if (typeof Peer === "undefined"){ diag("Error 1 · Esta página bloqueó el componente de conexión / This page blocked the connection library."); return; }
+    $("pJoinMsg").textContent = "1/3 · Conectando al servidor… / Reaching the server…";
+    try{ peer = new Peer(ICE); }catch(e){ diag("Error 1 · Esta página bloqueó el componente de conexión / This page blocked the connection library."); return; }
+    clearTimeout(dT); dT = setTimeout(() => diag("Error 2 · No se llega al servidor del juego / Can't reach the game server."), 10000);
     peer.on("open", () => {
+      clearTimeout(dT);
+      $("pJoinMsg").textContent = "2/3 · Buscando la pantalla… / Finding the big screen…";
+      dT = setTimeout(() => diag("Error 3 · Se encontró el juego, pero no se conecta con la pantalla / Found the game but can't reach the big screen."), 20000);
       conn = peer.connect(PREFIX + c, {reliable:true});
-      conn.on("open", () => conn.send({t:"join", name, token}));
+      conn.on("open", () => { clearTimeout(dT); $("pJoinMsg").textContent = "3/3 · Entrando… / Joining…"; conn.send({t:"join", name, token}); });
       conn.on("data", onMsg);
       conn.on("close", () => { if (joined){ setState({role:"wait", h:"Connection lost", sub:"Reconnecting…", temp:0}); setTimeout(connect, 1500); } });
     });
     peer.on("error", err => {
+      clearTimeout(dT);
+      if (!joined && ["network","server-error","socket-error","browser-incompatible","webrtc"].includes(err.type)){ diag((err.type === "browser-incompatible" || err.type === "webrtc") ? "Error 3 · Se encontró el juego, pero no se conecta con la pantalla / Found the game but can't reach the big screen." : "Error 2 · No se llega al servidor del juego / Can't reach the game server."); return; }
       $("pGo").disabled = false;
       $("pJoinMsg").textContent = err.type === "peer-unavailable" ? "No game with that code. Check the code on the screen." : "Couldn't connect. Check your internet and try again.";
       if (joined) setTimeout(connect, 2500); else view("pJoin");
