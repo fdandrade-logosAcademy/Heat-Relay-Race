@@ -1,0 +1,741 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Heat Relay Race</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;800&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@600;800&display=swap">
+<style>
+/* Layout: projector = stacked "lanes" (flame → particle chain → thermometer); phone = one giant tap button */
+:root{
+  --bg:#EDF2F6;          /* cool lab-bench grey-blue: the "cold" end of the scale */
+  --ink:#10222E;
+  --muted:#557081;
+  --panel:#FFFFFF;
+  --line:#CBD8E1;
+  --cold:#3B8FD9;        /* 20 °C */
+  --warm:#F0A12B;
+  --hot:#E8402A;         /* 90 °C, the single bold accent */
+  --good:#13845D;
+  --f-display:"Unbounded",system-ui,sans-serif;
+  --f-body:"Atkinson Hyperlegible",system-ui,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,monospace;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.4;-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
+button,select{font:inherit;color:inherit}
+button{cursor:pointer;border:0;background:none}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid var(--cold);outline-offset:3px}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0;line-height:1.08;font-weight:800}
+
+/* ---------- HOST ---------- */
+#host{height:100%;display:flex;flex-direction:column;padding:2vh 3vw;gap:1.6vh}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:2vw;font-size:clamp(14px,1.4vw,22px)}
+.brand{display:flex;align-items:center;gap:.6em;font-family:var(--f-display);font-weight:800}
+.brand svg{width:1.1em;height:1.8em}
+.meta{color:var(--muted);font-variant-numeric:tabular-nums}
+.view{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:safe center;gap:2.4vh;overflow-y:auto}
+.lanes.two{gap:1.6vh}
+.lanes.two .track{padding:1.2vh 1.4vw}
+.lanes.two .lanehead .mat{font-size:clamp(18px,2vw,36px)}
+.lanes.two .lanehead .time{font-size:clamp(20px,2.4vw,42px)}
+.lanes.two .hthermo .bulb{width:clamp(38px,5vh,70px)}
+.lanes.two .tube{height:clamp(18px,2.8vh,36px)}
+.lanes.two .hthermo .read{font-size:clamp(22px,3vw,52px)}
+.eyebrow{font-size:clamp(12px,1vw,17px);text-transform:uppercase;letter-spacing:.14em;color:var(--muted);font-weight:700}
+.btn{background:var(--ink);color:var(--bg);font-family:var(--f-display);font-weight:800;padding:.65em 1.3em;border-radius:999px;font-size:clamp(13px,1.15vw,19px);white-space:nowrap}
+.btn.hot{background:var(--hot);color:#fff}
+.btn.ghost{background:transparent;color:var(--ink);box-shadow:inset 0 0 0 2px var(--ink)}
+.btn:disabled{opacity:.35;cursor:not-allowed}
+.hint{color:var(--muted);font-size:clamp(12px,1vw,16px)}
+kbd{font-family:var(--f-mono);font-size:.9em;padding:.05em .4em;border:1px solid var(--line);border-radius:4px;background:var(--panel)}
+
+/* setup */
+.setup{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:4vw;align-items:center}
+.setup h1{font-size:clamp(34px,5vw,88px);letter-spacing:-.02em}
+.setup h1 em{font-style:normal;color:var(--hot)}
+.lede{font-size:clamp(15px,1.5vw,26px);max-width:40ch;color:var(--ink);margin-top:1.6vh}
+.chips{display:flex;flex-wrap:wrap;gap:.5em;margin-top:2.2vh;font-size:clamp(13px,1.3vw,21px);max-height:28vh;overflow:hidden}
+.chip{background:var(--panel);border:2px solid var(--line);padding:.2em .75em .2em .3em;border-radius:999px;font-weight:700;display:flex;align-items:center;gap:.45em;animation:pop .35s ease-out}
+.chip i{font-style:normal;font-family:var(--f-mono);font-size:.78em;background:var(--cold);color:#fff;border-radius:999px;min-width:1.7em;text-align:center;padding:.1em .35em}
+.chip.b i{background:var(--warm)}
+.chip.off{opacity:.4}
+@keyframes pop{from{transform:scale(.6);opacity:0}to{transform:none;opacity:1}}
+.count{font-family:var(--f-display);font-size:clamp(16px,1.8vw,30px);margin-top:1.6vh}
+.joinbox{display:flex;gap:2.4vw;align-items:center}
+#qr{background:#fff;padding:1vw;border-radius:14px;line-height:0;flex:none}
+#qr img,#qr canvas{width:min(20vw,32vh)!important;height:auto!important}
+.code{font-family:var(--f-mono);font-weight:800;font-size:clamp(44px,7vw,124px);letter-spacing:.08em;line-height:1}
+.url{font-family:var(--f-mono);font-size:clamp(11px,.95vw,15px);color:var(--muted);word-break:break-all;margin-top:.8vh}
+.warn{background:#FFF0D9;border:2px solid var(--warm);padding:.9em 1.1em;border-radius:12px;font-size:clamp(13px,1.05vw,17px);max-width:60ch}
+
+/* control bar */
+.controls{display:flex;flex-wrap:wrap;align-items:center;gap:1.2vw 1.6vw;background:var(--panel);border:2px solid var(--line);border-radius:18px;padding:1.2vh 1.4vw}
+.seg{display:flex;border:2px solid var(--ink);border-radius:999px;overflow:hidden}
+.seg button{padding:.45em 1em;font-weight:700;font-size:clamp(12px,1vw,17px)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.pick{display:flex;align-items:center;gap:.5em;font-weight:700;font-size:clamp(12px,1vw,17px)}
+.pick .tag{font-family:var(--f-mono);font-size:.8em;color:#fff;border-radius:6px;padding:.1em .45em}
+.pick select{font-weight:700;padding:.4em .6em;border:2px solid var(--line);border-radius:10px;background:var(--bg)}
+.spacer{flex:1}
+#hControls.racing .so{display:none!important}
+.scale span:first-child{visibility:hidden}
+
+/* race lanes */
+.lanes{display:flex;flex-direction:column;gap:3vh}
+.lane{display:flex;flex-direction:column;gap:1vh}
+.lanehead{display:flex;align-items:baseline;gap:1.4vw;flex-wrap:wrap}
+.lanehead .mat{font-family:var(--f-display);font-size:clamp(22px,2.6vw,46px)}
+.lanehead .kind{font-size:clamp(13px,1.2vw,20px);color:var(--muted);font-weight:700}
+.lanehead .time{margin-left:auto;font-family:var(--f-mono);font-weight:800;font-size:clamp(24px,3vw,54px);font-variant-numeric:tabular-nums}
+.lane.fin .time{color:var(--good)}
+.track{display:flex;align-items:center;gap:1.2vw;background:var(--panel);border:2px solid var(--line);border-radius:20px;padding:2vh 1.4vw}
+.flame{width:clamp(44px,4.6vw,86px);flex:none}
+.flame path{transform-origin:50% 100%;animation:flick .5s ease-in-out infinite alternate}
+.flame .inner{animation-duration:.37s}
+@keyframes flick{from{transform:scaleY(1) skewX(0)}to{transform:scaleY(.9) skewX(3deg)}}
+.parts{flex:1;min-width:0;display:flex;align-items:flex-start;justify-content:flex-start;gap:var(--gap,8px)}
+.pt{width:var(--size,60px);flex:none;display:flex;flex-direction:column;align-items:center;gap:.6vh}
+.dot{width:var(--size,60px);aspect-ratio:1;border-radius:50%;display:grid;place-items:center;color:#fff;font-family:var(--f-mono);font-weight:800;font-size:calc(var(--size,60px)*.27);
+  background:hsl(calc(207 - 199*var(--t,0)) 78% calc(55% - 6%*var(--t,0)));
+  box-shadow:0 0 calc(var(--size,60px)*.5*var(--t,0)) hsl(10 90% 55% / calc(.7*var(--t,0)));transition:background .25s,box-shadow .25s}
+.dot.small span{display:none}
+.pt.active .dot{outline:4px solid var(--ink);outline-offset:3px}
+.pt.hotdone .dot{animation:vib .18s linear infinite}
+.pt.jig .dot{animation:vib .09s linear 2}
+@keyframes vib{0%{transform:translate(0,0)}25%{transform:translate(-2px,1px)}50%{transform:translate(2px,-1px)}75%{transform:translate(-1px,-2px)}100%{transform:translate(0,0)}}
+.nm{font-size:clamp(10px,calc(var(--size,60px)*.22),18px);font-weight:700;max-width:calc(var(--size,60px) + var(--gap,8px));overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center}
+.pt.off .nm{color:var(--muted);text-decoration:line-through}
+/* big horizontal thermometer under each chain */
+.hthermo{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:0 1.4vw;padding:0 1.4vw}
+.hthermo .bulb{width:clamp(48px,7vh,92px);aspect-ratio:1;border-radius:50%;border:4px solid var(--ink);margin-right:-2.2vw;position:relative;z-index:1;
+  background:hsl(calc(207 - 199*var(--t,0)) 78% calc(55% - 6%*var(--t,0)));transition:background .3s}
+.tubewrap{display:flex;flex-direction:column;gap:.5vh;min-width:0}
+.tube{height:clamp(24px,3.8vh,48px);border:4px solid var(--ink);border-left:0;border-radius:0 999px 999px 0;background:var(--panel);overflow:hidden;
+  background-image:repeating-linear-gradient(90deg,transparent 0 calc(100%/14 - 2px),var(--line) calc(100%/14 - 2px) calc(100%/14))}
+.tube .fill{height:100%;width:0;background:hsl(calc(207 - 199*var(--t,0)) 78% calc(55% - 6%*var(--t,0)));transition:width .25s ease-out,background .3s}
+.scale{position:relative;height:1.4em;font-family:var(--f-mono);font-weight:600;font-size:clamp(11px,1.1vw,18px);color:var(--muted)}
+.scale span{position:absolute;transform:translateX(-50%)}
+.scale span:first-child{transform:none}
+.scale span:last-child{transform:translateX(-100%)}
+.hthermo .read{font-family:var(--f-mono);font-weight:800;font-size:clamp(28px,4vw,72px);font-variant-numeric:tabular-nums;min-width:4.2ch;text-align:right}
+.raceinfo{display:flex;justify-content:space-between;align-items:center;gap:2vw;flex-wrap:wrap}
+.countdown{position:fixed;inset:0;display:grid;place-items:center;background:rgba(237,242,246,.82);font-family:var(--f-display);font-size:min(40vw,60vh);color:var(--hot);z-index:4;pointer-events:none}
+
+/* results */
+.results{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:3vw;align-items:start}
+.results h2{font-size:clamp(26px,3.2vw,56px);margin-bottom:2vh}
+.tbl{overflow-x:auto;max-height:44vh;overflow-y:auto}
+table{border-collapse:collapse;width:100%;font-size:clamp(13px,1.2vw,20px);font-variant-numeric:tabular-nums}
+th,td{text-align:left;padding:.5em .7em;border-bottom:1px solid var(--line)}
+th{font-size:.78em;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)}
+td.num,th.num{text-align:right;font-family:var(--f-mono)}
+.bars{display:flex;flex-direction:column;gap:1.3vh}
+.barrow{display:grid;grid-template-columns:7.5em minmax(0,1fr) 5.5em;align-items:center;gap:1vw;font-size:clamp(13px,1.25vw,21px);font-weight:700}
+.barrow .b{height:clamp(18px,3vh,34px);border-radius:0 8px 8px 0;background:var(--hot);min-width:4px;transition:width .8s ease-out}
+.barrow .v{font-family:var(--f-mono);text-align:right}
+.axis{font-size:clamp(11px,.95vw,15px);color:var(--muted);margin-top:.6vh}
+.talk{margin-top:3vh;background:var(--panel);border:2px solid var(--line);border-radius:16px;padding:1.6vh 1.4vw}
+.talk h3{font-size:clamp(15px,1.4vw,24px);margin-bottom:1vh}
+.talk ol{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:.6vh;font-size:clamp(13px,1.2vw,20px)}
+.empty{color:var(--muted);font-size:clamp(14px,1.3vw,22px)}
+
+/* ---------- PLAYER ---------- */
+#player{min-height:100%;display:flex;flex-direction:column;padding:16px;gap:14px;transition:background .3s}
+#player.r-wait{background:#DCEAF6}
+#player.r-next{background:#FCE3B5}
+#player.r-active{background:#FBD2C8}
+#player.r-done{background:#F6B9A3}
+#player.r-finished{background:#D3EEDF}
+.pbar{display:flex;justify-content:space-between;align-items:center;gap:10px;font-weight:700}
+.pbar .me{font-family:var(--f-display);font-size:18px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.pbar .where{font-family:var(--f-mono);font-size:13px;background:var(--ink);color:var(--bg);padding:.3em .7em;border-radius:999px;white-space:nowrap}
+.pmain{flex:1;display:flex;flex-direction:column;justify-content:center;gap:16px;text-align:center}
+.pmain h1{font-size:30px}
+.pmain .sub{font-size:19px}
+.field{display:flex;flex-direction:column;gap:6px;text-align:left}
+.field label{font-weight:700;font-size:14px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em}
+.field input{font:inherit;font-size:24px;padding:14px 16px;border:2px solid var(--line);border-radius:12px;background:var(--panel);color:var(--ink);width:100%}
+#pCode{font-family:var(--f-mono);text-transform:uppercase;letter-spacing:.2em}
+.big{background:var(--hot);color:#fff;font-family:var(--f-display);font-weight:800;font-size:22px;padding:16px;border-radius:14px;width:100%}
+.big:disabled{opacity:.4}
+.psub{color:var(--muted)}
+.ball{width:150px;height:150px;border-radius:50%;margin:0 auto;display:grid;place-items:center;color:#fff;font-family:var(--f-mono);font-weight:800;font-size:30px;
+  background:hsl(calc(207 - 199*var(--t,0)) 78% calc(55% - 6%*var(--t,0)));box-shadow:0 0 calc(90px*var(--t,0)) hsl(10 90% 55% / calc(.7*var(--t,0)))}
+.r-done .ball{animation:vib .18s linear infinite}
+.r-next .ball{animation:breath 1s ease-in-out infinite}
+@keyframes breath{50%{transform:scale(1.07)}}
+#tapBtn{flex:1;min-height:58vh;border-radius:28px;background:var(--hot);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;touch-action:manipulation;user-select:none;-webkit-user-select:none;box-shadow:0 10px 0 #A82413;transition:transform .05s,box-shadow .05s}
+#tapBtn:active,#tapBtn.press{transform:translateY(8px);box-shadow:0 2px 0 #A82413}
+#tapBtn .word{font-family:var(--f-display);font-size:64px;letter-spacing:.04em}
+#tapBtn .cnt{font-family:var(--f-mono);font-size:30px;font-weight:800}
+.meter{height:16px;background:rgba(255,255,255,.35);border-radius:999px;width:70%;overflow:hidden}
+.meter i{display:block;height:100%;width:0;background:#fff;transition:width .08s}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<!-- ================= HOST (projector) ================= -->
+<div id="host" hidden>
+  <div class="topbar">
+    <div class="brand">
+      <svg viewBox="0 0 20 34" aria-hidden="true"><rect x="7" y="2" width="6" height="22" rx="3" fill="none" stroke="#10222E" stroke-width="2"/><circle cx="10" cy="27" r="5.5" fill="#E8402A"/><rect x="8.6" y="12" width="2.8" height="14" fill="#E8402A"/></svg>
+      Heat Relay Race
+    </div>
+    <div class="meta" id="hMeta">Unit 3 · Heat transfer by conduction</div>
+  </div>
+
+  <!-- setup / lobby -->
+  <section class="view" id="vSetup">
+    <div class="setup">
+      <div>
+        <div class="eyebrow">Science · 6 EGM</div>
+        <h1>You are a particle. <em>Pass the heat.</em></h1>
+        <p class="lede">Heat moves through a solid when each particle vibrates and bumps its neighbour. When the heat reaches you, tap until you pass it on.</p>
+        <div class="chips" id="hChips"></div>
+        <div class="count" id="hCount">Waiting for particles…</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:2vh">
+        <div class="joinbox">
+          <div id="qr"></div>
+          <div style="min-width:0">
+            <div class="eyebrow">Game code</div>
+            <div class="code" id="hCode">····</div>
+            <div class="url" id="hUrl"></div>
+          </div>
+        </div>
+        <div class="warn" id="hWarn" hidden></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- race -->
+  <section class="view" id="vRace" hidden>
+    <div class="lanes" id="hLanes"></div>
+    <div class="raceinfo">
+      <span class="hint" id="hRaceHint">Hot particles vibrate faster, and that vibration is what passes the heat along.</span>
+    </div>
+  </section>
+
+  <!-- results -->
+  <section class="view" id="vResults" hidden>
+    <div class="results">
+      <div>
+        <h2>Lab results</h2>
+        <div class="tbl"><table>
+          <thead><tr><th>Run</th><th>Material</th><th class="num">Particles</th><th class="num">Time (s)</th><th class="num">s / particle</th></tr></thead>
+          <tbody id="hTbody"></tbody>
+        </table></div>
+        <div style="display:flex;gap:10px;margin-top:2vh;flex-wrap:wrap">
+          <button class="btn ghost" id="hClear">Clear results</button>
+        </div>
+      </div>
+      <div>
+        <div class="eyebrow" style="margin-bottom:1.4vh">Average seconds per particle (shorter = better conductor)</div>
+        <div class="bars" id="hBars"></div>
+        <div class="talk">
+          <h3>Talk about it</h3>
+          <ol>
+            <li>Which material passed the heat fastest? Why do you think metals are good conductors?</li>
+            <li>In air the particles are far apart. How did that change the relay?</li>
+            <li>Why are pan handles made of wood or plastic, but the pan is metal?</li>
+            <li>Why did we compare <b>seconds per particle</b> instead of total time?</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- control bar (always visible on the projector) -->
+  <div class="controls" id="hControls">
+    <div class="seg so" role="group" aria-label="Number of chains">
+      <button id="hOne" aria-pressed="true">1 chain</button>
+      <button id="hTwo" aria-pressed="false">2 chains</button>
+    </div>
+    <label class="pick so"><span class="tag" style="background:var(--cold)">A</span><select id="hMatA"></select></label>
+    <label class="pick so" id="hPickB" hidden><span class="tag" style="background:var(--warm)">B</span><select id="hMatB"></select></label>
+    <button class="btn ghost so" id="hShuffle">Shuffle order</button>
+    <span class="spacer"></span>
+    <button class="btn ghost" id="hSkipA" hidden title="Key S">Skip particle</button>
+    <button class="btn ghost" id="hSkipB" hidden title="Key D">Skip B</button>
+    <button class="btn ghost" id="hStop" hidden>Stop race</button>
+    <button class="btn ghost so" id="hShowSetup" hidden>Players</button>
+    <button class="btn ghost" id="hShowResults">Results</button>
+    <button class="btn hot so" id="hStart" disabled>Start race</button>
+  </div>
+</div>
+<div class="countdown" id="hCountdown" hidden></div>
+
+<!-- ================= PLAYER (phone) ================= -->
+<div id="player" hidden>
+  <div class="pbar">
+    <span class="me" id="pMe">Heat Relay Race</span>
+    <span class="where" id="pWhere" hidden></span>
+  </div>
+  <div class="pmain" id="pJoin">
+    <h1>Join the relay</h1>
+    <div class="field"><label for="pCode">Game code</label><input id="pCode" maxlength="4" autocomplete="off"></div>
+    <div class="field"><label for="pName">Your name</label><input id="pName" maxlength="14" autocomplete="off"></div>
+    <button class="big" id="pGo">Join</button>
+    <div class="psub" id="pJoinMsg"></div>
+  </div>
+  <div class="pmain" id="pState" hidden>
+    <div class="ball" id="pBall"><span id="pTemp">20°</span></div>
+    <h1 id="pH">You're in!</h1>
+    <div class="sub" id="pSub">Look at the big screen.</div>
+  </div>
+  <button id="tapBtn" hidden aria-label="Tap to pass the heat">
+    <span class="word">TAP!</span>
+    <span class="cnt" id="pCnt">0 / 0</span>
+    <span class="meter"><i id="pMeter"></i></span>
+  </button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.5/peerjs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+"use strict";
+const PREFIX = "logos-hrr-";
+// taps = how hard it is to pass heat to the next particle; gap = how far apart the particles sit on screen.
+// Order matches real thermal conductivity: copper > steel > plastic > wood > wool > air.
+const MATS = {
+  copper: {name:"Copper",  kind:"Metal · good conductor", taps:5,  gap:.12},
+  steel:  {name:"Steel",   kind:"Metal · conductor",      taps:7,  gap:.2},
+  plastic:{name:"Plastic", kind:"Insulator",              taps:14, gap:.5},
+  wood:   {name:"Wood",    kind:"Insulator",              taps:16, gap:.6},
+  wool:   {name:"Wool",    kind:"Insulator (traps air)",  taps:19, gap:.95},
+  air:    {name:"Air",     kind:"Gas · poor conductor",   taps:22, gap:1.7}
+};
+const $ = id => document.getElementById(id);
+const store = { get(k){ try{return localStorage.getItem(k);}catch(e){return null;} }, set(k,v){ try{localStorage.setItem(k,v);}catch(e){} } };
+const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const degC = t => Math.round(20 + 70*t);
+
+const params = new URLSearchParams(location.search);
+if (params.has("join")) startPlayer(params.get("join") || ""); else startHost();
+
+/* =================================================================
+   HOST
+   ================================================================= */
+function startHost(){
+  $("host").hidden = false;
+  const players = new Map();   // key -> {name, conn, token}
+  let order = [];              // keys, in chain order
+  let lanesCount = 1;
+  let phase = "setup";         // setup | count | race | done
+  let chains = [];             // {mat, keys:[], idx, taps, start, end}
+  let round = 0, raf = 0, peer = null, code = "", audio = null;
+  let results = [];
+  try { results = JSON.parse(store.get("hrr-results") || "[]"); } catch(e){ results = []; }
+
+  for (const sel of [$("hMatA"), $("hMatB")])
+    sel.innerHTML = Object.entries(MATS).map(([k,m]) => `<option value="${k}">${m.name} · ${m.taps} taps</option>`).join("");
+  $("hMatA").value = store.get("hrr-a") || "copper";
+  $("hMatB").value = store.get("hrr-b") || "wood";
+  $("hMatA").onchange = () => store.set("hrr-a", $("hMatA").value);
+  $("hMatB").onchange = () => store.set("hrr-b", $("hMatB").value);
+
+  if (location.protocol === "file:"){
+    $("hWarn").hidden = false;
+    $("hWarn").innerHTML = "<b>Phones can't open this file from your computer.</b> Upload it to a free host such as Netlify Drop (app.netlify.com/drop) or GitHub Pages, then open that web address on the projector.";
+  }
+
+  /* ---- connection ---- */
+  function openPeer(){
+    const L = "ABCDEFGHJKMNPQRSTUVWXYZ";
+    code = Array.from({length:4},()=>L[Math.floor(Math.random()*L.length)]).join("");
+    peer = new Peer(PREFIX + code);
+    peer.on("open", () => {
+      $("hCode").textContent = code;
+      const url = `${location.origin}${location.pathname}?join=${code}`;
+      $("hUrl").textContent = url.replace(/^https?:\/\//,"");
+      $("qr").innerHTML = "";
+      new QRCode($("qr"), {text:url, width:300, height:300, colorDark:"#10222E", colorLight:"#ffffff", correctLevel:QRCode.CorrectLevel.M});
+    });
+    peer.on("error", err => {
+      if (err.type === "unavailable-id"){ peer.destroy(); openPeer(); return; }
+      if (["network","server-error","socket-error"].includes(err.type)){
+        $("hWarn").hidden = false;
+        $("hWarn").innerHTML = "<b>Can't reach the game server.</b> Check this computer's internet connection, then reload the page.";
+      }
+    });
+    peer.on("disconnected", () => { try{ peer.reconnect(); }catch(e){} });
+    peer.on("connection", conn => {
+      conn.on("data", m => onMsg(conn, m));
+      conn.on("close", () => { renderChips(); renderLanes(); });
+    });
+  }
+  openPeer();
+
+  const online = p => !!(p && p.conn && p.conn.open);
+  function send(p, m){ if (online(p)) try{ p.conn.send(m); }catch(e){} }
+
+  function onMsg(conn, m){
+    if (!m || typeof m !== "object") return;
+    if (m.t === "join"){
+      const name = String(m.name||"").trim().slice(0,14);
+      if (!name){ conn.send({t:"err", text:"Type your name first."}); return; }
+      const key = name.toLowerCase();
+      let p = players.get(key);
+      if (p && online(p) && p.conn !== conn && p.token !== m.token){ conn.send({t:"err", text:`"${name}" is taken. Try another name.`}); return; }
+      if (!p){ p = {name}; players.set(key, p); order.push(key); }
+      p.conn = conn; p.token = m.token;
+      conn.send({t:"welcome", name:p.name});
+      sync(key);
+      renderChips(); renderLanes();
+    }
+    if (m.t === "tap" && phase === "race"){
+      const key = [...players.entries()].find(([,p]) => p.conn === conn)?.[0];
+      const ch = chains.find(c => c.keys[c.idx] === key && c.end === 0);
+      if (!ch) return;
+      ch.taps++;
+      const el = document.querySelector(`[data-c="${chains.indexOf(ch)}"][data-i="${ch.idx}"]`);
+      if (el){ el.classList.remove("jig"); void el.offsetWidth; el.classList.add("jig"); }
+      if (ch.taps >= MATS[ch.mat].taps) pass(ch);
+      else paintLane(chains.indexOf(ch));
+    }
+  }
+
+  /* ---- what each phone should show ---- */
+  function stateFor(key){
+    const p = players.get(key);
+    if (phase === "setup") return {t:"st", role:"idle", h:"You're in!", sub:"Look at the big screen. The race starts soon.", temp:0};
+    if (phase === "count") return {t:"st", role:"wait", h:"Get ready…", sub:"The flame is lighting up.", temp:0};
+    for (let c = 0; c < chains.length; c++){
+      const ch = chains[c], pos = ch.keys.indexOf(key);
+      if (pos < 0) continue;
+      const mat = MATS[ch.mat];
+      const where = `${chains.length>1?(c?"B":"A")+" · ":""}${mat.name} · #${pos+1}/${ch.keys.length}`;
+      if (ch.end) return {t:"st", role:"finished", h:"Heat delivered!", sub:`The ${mat.name.toLowerCase()} chain warmed the thermometer in ${((ch.end-ch.start)/1000).toFixed(1)} s.`, temp: pos <= ch.idx ? 1 : 0, where};
+      if (pos < ch.idx)  return {t:"st", role:"done", h:"You're hot!", sub:"You passed the heat on. Your particles keep vibrating.", temp:1, where};
+      if (pos === ch.idx) return {t:"st", role:"active", need:mat.taps, round, c, pos, where};
+      if (pos === ch.idx+1) return {t:"st", role:"next", h:"Heat is coming!", sub:"Your neighbour is vibrating. Get your thumb ready.", temp:.15, where};
+      return {t:"st", role:"wait", h:"Stay cool…", sub:`You are particle ${pos+1} of ${ch.keys.length}. Wait for the heat.`, temp:0, where};
+    }
+    return {t:"st", role:"idle", h:"Sit this one out", sub:"You'll join the next race.", temp:0};
+  }
+  function sync(key){ send(players.get(key), stateFor(key)); }
+  function syncAll(){ for (const k of players.keys()) sync(k); }
+
+  /* ---- setup screen ---- */
+  function renderChips(){
+    const live = order.filter(k => online(players.get(k)));
+    const lane = k => lanesCount === 2 ? live.indexOf(k) % 2 : 0;
+    $("hChips").innerHTML = order.map(k => {
+      const p = players.get(k), on = online(p);
+      const i = live.indexOf(k);
+      const n = on ? (lanesCount === 2 ? Math.floor(i/2)+1 : i+1) : "–";
+      return `<span class="chip${lane(k)===1?" b":""}${on?"":" off"}"><i>${lanesCount===2&&on?(lane(k)?"B":"A"):""}${n}</i>${esc(p.name)}</span>`;
+    }).join("");
+    $("hCount").textContent = live.length ? `${live.length} particle${live.length===1?"":"s"} ready` : "Waiting for particles…";
+    $("hStart").disabled = live.length < (lanesCount === 2 ? 2 : 1) || phase === "race" || phase === "count";
+  }
+
+  function show(id){
+    for (const v of ["vSetup","vRace","vResults"]) $(v).hidden = v !== id;
+    $("hShowSetup").hidden = id === "vSetup";
+    $("hShowResults").hidden = id === "vResults";
+    $("hLanes").classList.toggle("two", chains.length > 1);
+    syncControls();
+  }
+  // during a race the bar shows only Skip / Stop / Results, so it stays on one line
+  function syncControls(){
+    const racing = phase === "race" || phase === "count";
+    $("hControls").classList.toggle("racing", racing);
+    $("hStop").hidden = !racing;
+    $("hSkipA").hidden = !racing;
+    $("hSkipB").hidden = !racing || chains.length < 2;
+    $("hSkipA").textContent = chains.length > 1 ? "Skip A" : "Skip particle";
+  }
+
+  /* ---- race ---- */
+  function renderLanes(){
+    if (phase === "setup") return;
+    $("hLanes").innerHTML = chains.map((ch,c) => {
+      const m = MATS[ch.mat];
+      return `<div class="lane" id="lane${c}">
+        <div class="lanehead"><span class="mat">${chains.length>1?(c?"B · ":"A · "):""}${m.name}</span><span class="kind">${m.kind} · ${m.taps} taps per particle</span><span class="time" id="time${c}">0.0 s</span></div>
+        <div class="track">
+          <svg class="flame" viewBox="0 0 40 56" aria-label="Heat source"><path d="M20 2C26 14 36 20 36 34a16 16 0 0 1-32 0c0-8 5-12 7-18 2 6 5 8 7 8C18 16 16 9 20 2z" fill="#E8402A"/><path class="inner" d="M20 24c4 6 8 9 8 15a8 8 0 0 1-16 0c0-5 4-8 8-15z" fill="#F0A12B"/></svg>
+          <div class="parts" id="parts${c}">${ch.keys.map((k,i) => `<div class="pt" data-c="${c}" data-i="${i}"><div class="dot"><span></span></div><div class="nm">${esc(players.get(k).name)}</div></div>`).join("")}</div>
+        </div>
+        <div class="hthermo" aria-label="Thermometer">
+          <div class="bulb" id="bulb${c}"></div>
+          <div class="tubewrap">
+            <div class="tube"><div class="fill" id="fill${c}"></div></div>
+            <div class="scale">${[20,30,40,50,60,70,80,90].map(v => `<span style="left:${((v-20)/70*100).toFixed(2)}%">${v}</span>`).join("")}</div>
+          </div>
+          <div class="read" id="read${c}">20 °C</div>
+        </div></div>`;
+    }).join("");
+    sizeLanes();
+    chains.forEach((_,c) => paintLane(c));
+  }
+
+  function sizeLanes(){
+    chains.forEach((ch,c) => {
+      const el = $("parts"+c); if (!el) return;
+      const n = ch.keys.length, g = MATS[ch.mat].gap;
+      const size = Math.max(14, Math.min(chains.length > 1 ? 72 : 110, el.clientWidth / (n + (n-1)*g)));
+      el.style.setProperty("--size", size+"px");
+      el.style.setProperty("--gap", (size*g)+"px");
+      el.querySelectorAll(".dot").forEach(d => d.classList.toggle("small", size < 40));
+    });
+  }
+  window.addEventListener("resize", sizeLanes);
+
+  function paintLane(c){
+    const ch = chains[c], need = MATS[ch.mat].taps;
+    document.querySelectorAll(`.pt[data-c="${c}"]`).forEach(el => {
+      const i = +el.dataset.i;
+      let t = 0;
+      if (ch.end || i < ch.idx) t = 1;
+      else if (i === ch.idx) t = .15 + .85*Math.min(1, ch.taps/need);
+      el.style.setProperty("--t", t.toFixed(3));
+      el.querySelector(".dot span").textContent = degC(t)+"°";
+      el.classList.toggle("active", !ch.end && i === ch.idx);
+      el.classList.toggle("hotdone", t === 1);
+      el.classList.toggle("off", !online(players.get(ch.keys[i])));
+    });
+    // the thermometer follows the heat front: 20 °C at the start, 90 °C when the last particle is hot
+    const prog = ch.end ? 1 : Math.min(1, (ch.idx + Math.min(1, ch.taps/need)) / ch.keys.length);
+    const fill = $("fill"+c), bulb = $("bulb"+c);
+    if (fill){ fill.style.width = (100*prog).toFixed(2) + "%"; fill.style.setProperty("--t", prog.toFixed(3)); }
+    if (bulb) bulb.style.setProperty("--t", prog.toFixed(3));
+    if ($("read"+c)) $("read"+c).textContent = degC(prog) + " °C";
+    $("lane"+c)?.classList.toggle("fin", !!ch.end);
+  }
+
+  function chime(freqs){
+    try{
+      audio = audio || new (window.AudioContext||window.webkitAudioContext)();
+      freqs.forEach((f,i) => {
+        const o = audio.createOscillator(), g = audio.createGain(), t = audio.currentTime + i*.11;
+        o.type = "triangle"; o.frequency.value = f;
+        g.gain.setValueAtTime(.0001,t); g.gain.exponentialRampToValueAtTime(.16,t+.02); g.gain.exponentialRampToValueAtTime(.0001,t+.3);
+        o.connect(g).connect(audio.destination); o.start(t); o.stop(t+.35);
+      });
+    }catch(e){}
+  }
+
+  function startRace(){
+    const live = order.filter(k => online(players.get(k)));
+    if (!live.length) return;
+    round++;
+    const mats = lanesCount === 2 ? [$("hMatA").value, $("hMatB").value] : [$("hMatA").value];
+    chains = mats.map((mat,c) => ({mat, keys: lanesCount === 2 ? live.filter((_,i) => i%2 === c) : live.slice(), idx:0, taps:0, start:0, end:0}))
+                 .filter(ch => ch.keys.length);
+    phase = "count";
+    $("hMeta").textContent = `Race ${round}`;
+    show("vRace"); renderLanes(); syncAll(); renderChips();
+    try{ document.documentElement.requestFullscreen?.().catch(()=>{}); }catch(e){}
+    let n = 3;
+    const cd = $("hCountdown"); cd.hidden = false; cd.textContent = n; chime([440]);
+    const iv = setInterval(() => {
+      n--;
+      if (n > 0){ cd.textContent = n; chime([440]); return; }
+      clearInterval(iv); cd.hidden = true; chime([880]);
+      phase = "race";
+      const now = Date.now();
+      chains.forEach(ch => { ch.start = now; });
+      syncAll(); chains.forEach((_,c) => paintLane(c));
+      cancelAnimationFrame(raf); raf = requestAnimationFrame(loop);
+    }, 900);
+  }
+
+  function pass(ch){
+    const c = chains.indexOf(ch);
+    const prev = ch.keys[ch.idx];
+    ch.idx++; ch.taps = 0; ch.offSince = 0;
+    if (ch.idx >= ch.keys.length){
+      ch.idx = ch.keys.length - 1;
+      ch.end = Date.now();
+      const secs = (ch.end - ch.start)/1000;
+      results.push({run: round, mat: ch.mat, n: ch.keys.length, secs: +secs.toFixed(2)});
+      store.set("hrr-results", JSON.stringify(results));
+      chime([659,784,1047]);
+      ch.keys.forEach(sync);
+      if (chains.every(x => x.end)) finishRace();
+    } else {
+      sync(prev); sync(ch.keys[ch.idx]);
+      if (ch.keys[ch.idx+1]) sync(ch.keys[ch.idx+1]);
+    }
+    paintLane(c);
+  }
+
+  function loop(){
+    if (phase !== "race") return;
+    const now = Date.now();
+    chains.forEach((ch,c) => {
+      if (!ch.end){
+        $("time"+c).textContent = ((now - ch.start)/1000).toFixed(1) + " s";
+        // a phone that dropped out mid-relay: pass its heat on after 3 s so the race keeps going
+        const p = players.get(ch.keys[ch.idx]);
+        if (!online(p)){ ch.offSince = ch.offSince || now; if (now - ch.offSince > 3000) pass(ch); }
+        else ch.offSince = 0;
+      } else $("time"+c).textContent = ((ch.end - ch.start)/1000).toFixed(1) + " s";
+    });
+    raf = requestAnimationFrame(loop);
+  }
+
+  function finishRace(){
+    phase = "done";
+    cancelAnimationFrame(raf);
+    chains.forEach((ch,c) => { $("time"+c).textContent = ((ch.end - ch.start)/1000).toFixed(1) + " s"; });
+    $("hRaceHint").textContent = "Race finished. Open Results to compare materials, or start the next race.";
+    syncControls();
+    renderChips();
+  }
+
+  function stopRace(){
+    phase = "setup"; chains = []; cancelAnimationFrame(raf);
+    $("hCountdown").hidden = true;
+    $("hMeta").textContent = "Unit 3 · Heat transfer by conduction";
+    $("hRaceHint").textContent = "Hot particles vibrate faster, and that vibration is what passes the heat along.";
+    syncAll(); renderChips(); show("vSetup"); syncControls();
+  }
+
+  /* ---- results ---- */
+  function renderResults(){
+    $("hTbody").innerHTML = results.length ? results.map((r,i) =>
+      `<tr><td>${i+1}</td><td>${esc(MATS[r.mat]?.name || r.mat)}</td><td class="num">${r.n}</td><td class="num">${r.secs.toFixed(1)}</td><td class="num">${(r.secs/r.n).toFixed(2)}</td></tr>`).join("")
+      : `<tr><td colspan="5" class="empty">No races yet. Run one race per material, then come back here.</td></tr>`;
+    const by = {};
+    results.forEach(r => { (by[r.mat] = by[r.mat] || []).push(r.secs/r.n); });
+    const avg = Object.entries(by).map(([k,v]) => ({k, v: v.reduce((a,b)=>a+b,0)/v.length, runs:v.length})).sort((a,b) => a.v - b.v);
+    const max = Math.max(...avg.map(a => a.v), 0.01);
+    $("hBars").innerHTML = avg.length ? avg.map(a =>
+      `<div class="barrow"><span>${esc(MATS[a.k]?.name || a.k)}</span><span class="b" style="width:0" data-w="${(100*a.v/max).toFixed(1)}"></span><span class="v">${a.v.toFixed(2)} s</span></div>`).join("")
+      + `<div class="axis">Bars start at 0 s. Each bar averages ${avg.reduce((s,a)=>s+a.runs,0)} race${results.length===1?"":"s"} by material.</div>`
+      : `<div class="empty">The chart appears after your first race.</div>`;
+    requestAnimationFrame(() => document.querySelectorAll(".barrow .b").forEach(b => { b.style.width = b.dataset.w + "%"; }));
+  }
+
+  /* ---- controls ---- */
+  function setLanes(n){
+    lanesCount = n;
+    $("hOne").setAttribute("aria-pressed", n === 1); $("hTwo").setAttribute("aria-pressed", n === 2);
+    $("hPickB").hidden = n !== 2;
+    renderChips();
+  }
+  $("hOne").onclick = () => setLanes(1);
+  $("hTwo").onclick = () => setLanes(2);
+  $("hShuffle").onclick = () => { for (let i = order.length-1; i > 0; i--){ const j = Math.floor(Math.random()*(i+1)); [order[i],order[j]] = [order[j],order[i]]; } renderChips(); };
+  $("hStart").onclick = startRace;
+  $("hStop").onclick = stopRace;
+  const skip = c => { if (phase === "race" && chains[c] && !chains[c].end) pass(chains[c]); };
+  $("hSkipA").onclick = () => skip(0);
+  $("hSkipB").onclick = () => skip(1);
+  $("hShowResults").onclick = () => { renderResults(); show("vResults"); };
+  $("hShowSetup").onclick = () => { if (phase === "race" || phase === "count") return; stopRace(); };
+  let clearArm = 0;
+  $("hClear").onclick = () => {
+    if (Date.now() - clearArm < 3000){ results = []; store.set("hrr-results","[]"); renderResults(); $("hClear").textContent = "Clear results"; clearArm = 0; return; }
+    clearArm = Date.now(); $("hClear").textContent = "Click again to clear";
+    setTimeout(() => { $("hClear").textContent = "Clear results"; }, 3000);
+  };
+  document.addEventListener("keydown", e => {
+    if (e.target.tagName === "SELECT") return;
+    if (e.code === "Space" && !$("hStart").disabled){ e.preventDefault(); startRace(); }
+    if (e.key === "s" || e.key === "S") skip(0);
+    if (e.key === "d" || e.key === "D") skip(1);
+  });
+
+  setLanes(1);
+  show("vSetup");
+}
+
+/* =================================================================
+   PLAYER
+   ================================================================= */
+function startPlayer(code){
+  $("player").hidden = false;
+  $("pCode").value = code.toUpperCase();
+  $("pName").value = store.get("hrr-name") || "";
+  let token = store.get("hrr-token");
+  if (!token){ token = Math.random().toString(36).slice(2); store.set("hrr-token", token); }
+  let peer = null, conn = null, joined = false, need = 0, taps = 0, activeKey = "", lastTap = 0, sent = false;
+
+  function view(id){ for (const v of ["pJoin","pState","tapBtn"]) $(v).hidden = v !== id; }
+  async function keepAwake(){ try{ await navigator.wakeLock?.request("screen"); }catch(e){} }
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && joined) keepAwake(); });
+
+  function connect(){
+    const c = $("pCode").value.trim().toUpperCase(), name = $("pName").value.trim();
+    if (c.length !== 4){ $("pJoinMsg").textContent = "The game code has 4 letters. It's on the big screen."; return; }
+    if (!name){ $("pJoinMsg").textContent = "Type your name."; return; }
+    store.set("hrr-name", name);
+    $("pGo").disabled = true; $("pJoinMsg").textContent = "Connecting…";
+    if (peer) try{ peer.destroy(); }catch(e){}
+    peer = new Peer();
+    peer.on("open", () => {
+      conn = peer.connect(PREFIX + c, {reliable:true});
+      conn.on("open", () => conn.send({t:"join", name, token}));
+      conn.on("data", onMsg);
+      conn.on("close", () => { if (joined){ setState({role:"wait", h:"Connection lost", sub:"Reconnecting…", temp:0}); setTimeout(connect, 1500); } });
+    });
+    peer.on("error", err => {
+      $("pGo").disabled = false;
+      $("pJoinMsg").textContent = err.type === "peer-unavailable" ? "No game with that code. Check the code on the screen." : "Couldn't connect. Check your internet and try again.";
+      if (joined) setTimeout(connect, 2500); else view("pJoin");
+    });
+  }
+
+  function setState(s){
+    $("player").className = "r-" + s.role;
+    $("pWhere").hidden = !s.where; $("pWhere").textContent = s.where || "";
+    if (s.role === "active"){
+      const key = `${s.round}-${s.c}-${s.pos}`;
+      if (key !== activeKey){ activeKey = key; taps = 0; sent = false; }
+      need = s.need;
+      drawTaps(); view("tapBtn");
+      try{ navigator.vibrate?.([80,40,80]); }catch(e){}
+      return;
+    }
+    $("pBall").style.setProperty("--t", s.temp || 0);
+    $("pTemp").textContent = degC(s.temp || 0) + "°";
+    $("pH").textContent = s.h; $("pSub").textContent = s.sub;
+    view("pState");
+  }
+
+  function drawTaps(){
+    $("pCnt").textContent = `${Math.min(taps,need)} / ${need}`;
+    $("pMeter").style.width = (100*Math.min(1, taps/need)) + "%";
+  }
+
+  function onMsg(m){
+    if (!m || typeof m !== "object") return;
+    if (m.t === "err"){ joined = false; $("pGo").disabled = false; $("pJoinMsg").textContent = m.text; view("pJoin"); return; }
+    if (m.t === "welcome"){ joined = true; $("pMe").textContent = m.name; keepAwake(); }
+    if (m.t === "st") setState(m);
+  }
+
+  const tap = e => {
+    e.preventDefault();
+    const now = Date.now();
+    if (now - lastTap < 60 || sent || !conn) return;   // ignore accidental double-fires
+    lastTap = now; taps++;
+    $("tapBtn").classList.add("press"); setTimeout(() => $("tapBtn").classList.remove("press"), 70);
+    try{ navigator.vibrate?.(15); }catch(e){}
+    try{ conn.send({t:"tap"}); }catch(err){}
+    if (taps >= need) sent = true;
+    drawTaps();
+  };
+  $("tapBtn").addEventListener("pointerdown", tap);
+  // on laptops the Space bar works as the tap button, wherever the focus is
+  document.addEventListener("keydown", e => { if (!$("tapBtn").hidden && !e.repeat && (e.key === " " || e.key === "Enter")) tap(e); });
+
+  $("pGo").onclick = connect;
+  $("pCode").addEventListener("input", e => { e.target.value = e.target.value.toUpperCase().replace(/[^A-Z]/g,""); });
+  for (const id of ["pCode","pName"]) $(id).addEventListener("keydown", e => { if (e.key === "Enter") connect(); });
+  (code ? $("pName") : $("pCode")).focus();
+}
+</script>
+</body>
+</html>
